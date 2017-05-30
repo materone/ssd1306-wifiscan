@@ -177,17 +177,15 @@ void app_main() {
 
    //begin wifi sta
    wifi_sta_config_t sta ;
-   uint8_t ssid[32];
-   sprintf(ssid,"%s","CoolDog"); 
-   sta.ssid = ssid; 
-   sta.password = "xxxxx";
+   memcpy(sta.ssid,"CoolDog",sizeof(uint8_t)*32); 
+   memcpy(sta.password,"*****",sizeof(uint8_t)*64);
    sta.bssid_set = false;
 
    wifi_config_t sta_config = {
       .sta = sta
    };
    tcpip_adapter_ip_info_t ip_info;
-   ip4_addr_t ip = {ipaddr_addr("192.168.199.188")};
+   ip4_addr_t ip = {ipaddr_addr("192.168.199.123")};
    ip4_addr_t netmask = {ipaddr_addr("255.255.255.0")};
    ip4_addr_t gw = {ipaddr_addr("192.168.199.1")};
    ip_info.ip = ip;
