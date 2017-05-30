@@ -174,6 +174,31 @@ void app_main() {
    //                                                               //the scan is done.
    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
    // }
+
+   //begin wifi sta
+   wifi_sta_config_t sta ;
+   uint8_t ssid[32];
+   sprintf(ssid,"%s","CoolDog"); 
+   sta.ssid = ssid; 
+   sta.password = "xxxxx";
+   sta.bssid_set = false;
+
+   wifi_config_t sta_config = {
+      .sta = sta
+   };
+   tcpip_adapter_ip_info_t ip_info;
+   ip4_addr_t ip = {ipaddr_addr("192.168.199.188")};
+   ip4_addr_t netmask = {ipaddr_addr("255.255.255.0")};
+   ip4_addr_t gw = {ipaddr_addr("192.168.199.1")};
+   ip_info.ip = ip;
+   ip_info.netmask = netmask;
+   ip_info.gw = gw;
+
+   ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
+   ESP_ERROR_CHECK( esp_wifi_start() );
+   tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+   ESP_ERROR_CHECK( esp_wifi_connect() );
+   tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
    
 }
 #ifdef __cplusplus
