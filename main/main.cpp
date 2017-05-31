@@ -142,7 +142,7 @@ void app_main() {
 				oled.measure_string("tahoma_8pt_font_info"));
 		oled.draw_string(55, 30, "Hello ESP32!", WHITE, BLACK);
 		oled.refresh(true);
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
+		vTaskDelay(2000 / portTICK_PERIOD_MS);
 		//xTaskCreatePinnedToCore(&myTask, "adctask", 2048, NULL, 5, NULL, 1);
 	} else {
 		ESP_LOGE("OLED", "oled init failed");
@@ -166,9 +166,9 @@ void app_main() {
    };
 
    //start wifi scan
-   ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
+   // ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
    //stop wifi scan                                                               //the scan is done.
-   ESP_ERROR_CHECK(esp_wifi_scan_stop()); 
+   // ESP_ERROR_CHECK(esp_wifi_scan_stop()); 
    // while(true){
    //     ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
    //                                                               //the scan is done.
@@ -177,8 +177,8 @@ void app_main() {
 
    //begin wifi sta
    wifi_sta_config_t sta ;
-   memcpy(sta.ssid,"CoolDog",sizeof(uint8_t)*32); 
-   memcpy(sta.password,"*****",sizeof(uint8_t)*64);
+   memcpy(sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
+   memcpy(sta.password,"",sizeof(uint8_t)*64);
    sta.bssid_set = false;
 
    wifi_config_t sta_config = {
