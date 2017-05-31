@@ -5,6 +5,7 @@
 #include "driver/adc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/event_groups.h"
 #include <cstdio>
 #include <string>
 #include <sstream>
@@ -16,14 +17,46 @@
 #include "esp_event_loop.h"
 #include "nvs_flash.h"
 
+//for sntp
+#include <time.h>
+#include <sys/time.h>
+#include "esp_log.h"
+#include "esp_attr.h"
+#include "esp_deep_sleep.h"
+
+#include "lwip/err.h"
+#include "apps/sntp/sntp.h"
+
 using namespace std;
 
 OLED oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 
+/* FreeRTOS event group to signal when we are connected & ready to make a request */
+static EventGroupHandle_t wifi_event_group;
+
+/* The event group allows multiple bits for each event,
+   but we only care about one event - are we connected
+   to the AP with an IP? */
+const int CONNECTED_BIT = BIT0;
+
+static const char *TAG = "OLED-WiFi-RTC";
+
+/* Variable holding number of times ESP32 restarted since first boot.
+ * It is placed into RTC memory using RTC_DATA_ATTR and
+ * maintains its value when ESP32 wakes from deep sleep.
+ */
+RTC_DATA_ATTR static int boot_count = 0;
+
+static void obtain_time(void);
+static void initialize_sntp(void);
+static void initialise_wifi(void);
+static esp_err_t event_handler(void *ctx, system_event_t *event);
+
+
 void myTask(void *pvParameters) {
 	adc1_config_width(ADC_WIDTH_12Bit);
 	adc1_config_channel_atten(ADC1_CHANNEL_4, ADC_ATTEN_0db);
-	bool flag=true;
+	// bool flag=true;
 
 	ostringstream os;
 //	char *data = (char*) malloc(32);
@@ -85,22 +118,22 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
          char *authmode;
          switch(list[i].authmode) {
             case WIFI_AUTH_OPEN:
-               authmode = "WIFI_AUTH_OPEN";
+               authmode = (char *)"WIFI_AUTH_OPEN";
                break;
             case WIFI_AUTH_WEP:
-               authmode = "WIFI_AUTH_WEP";
+               authmode = (char *)"WIFI_AUTH_WEP";
                break;           
             case WIFI_AUTH_WPA_PSK:
-               authmode = "WIFI_AUTH_WPA_PSK";
+               authmode = (char *)"WIFI_AUTH_WPA_PSK";
                break;           
             case WIFI_AUTH_WPA2_PSK:
-               authmode = "WIFI_AUTH_WPA2_PSK";
+               authmode = (char *)"WIFI_AUTH_WPA2_PSK";
                break;           
             case WIFI_AUTH_WPA_WPA2_PSK:
-               authmode = "WIFI_AUTH_WPA_WPA2_PSK";
+               authmode = (char *)"WIFI_AUTH_WPA_WPA2_PSK";
                break;
             default:
-               authmode = "Unknown";
+               authmode = (char *)"Unknown";
                break;
          }
          printf("%26.26s    |    % 4d    |    %22.22s\n",list[i].ssid, list[i].rssi, authmode);
@@ -123,29 +156,29 @@ extern "C" {
 #endif
 void app_main() {
 	nvs_flash_init();
-	system_init();
+	// system_init();
 
 	//oled test
 	oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 	if (oled.init()) {
-		ESP_LOGI("OLED", "oled inited");
+		ESP_LOGI(TAG, "oled inited");
 		oled.draw_rectangle(10, 30, 20, 20, WHITE);
 		oled.draw_rectangle(0, 0, 128, 64, WHITE);
 		oled.select_font(0);
 		//deprecated conversion from string constant to 'char*'
 		oled.draw_string(1, 1, "glcd_5x7_font_info", WHITE, BLACK);
-		ESP_LOGI("OLED", "String length:%d",
+		ESP_LOGI(TAG, "String length:%d",
 				oled.measure_string("glcd_5x7_font_info"));
 		oled.select_font(1);
 		oled.draw_string(1, 18, "tahoma_8pt_font_info", WHITE, BLACK);
-		ESP_LOGI("OLED", "String length:%d",
+		ESP_LOGI(TAG, "String length:%d",
 				oled.measure_string("tahoma_8pt_font_info"));
 		oled.draw_string(55, 30, "Hello ESP32!", WHITE, BLACK);
 		oled.refresh(true);
 		vTaskDelay(2000 / portTICK_PERIOD_MS);
 		//xTaskCreatePinnedToCore(&myTask, "adctask", 2048, NULL, 5, NULL, 1);
 	} else {
-		ESP_LOGE("OLED", "oled init failed");
+		ESP_LOGE(TAG, "oled init failed");
 	}
 
 	//wifi scan
