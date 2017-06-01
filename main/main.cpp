@@ -45,12 +45,12 @@ static const char *TAG = "OLED-WiFi-RTC";
  * It is placed into RTC memory using RTC_DATA_ATTR and
  * maintains its value when ESP32 wakes from deep sleep.
  */
-RTC_DATA_ATTR static int boot_count = 0;
+RTC_DATA_ATTR static int boot_count ;
 
-static void obtain_time(void);
-static void initialize_sntp(void);
-static void initialise_wifi(void);
-static esp_err_t event_handler(void *ctx, system_event_t *event);
+// static void obtain_time(void);
+// static void initialize_sntp(void);
+// static void initialise_wifi(void);
+// static esp_err_t event_handler(void *ctx, system_event_t *event);
 
 
 void myTask(void *pvParameters) {
@@ -98,7 +98,7 @@ void myTask(void *pvParameters) {
 
 }
 
-esp_err_t event_handler(void *ctx, system_event_t *event)
+esp_err_t event_handler_scan(void *ctx, system_event_t *event)
 {
 	ostringstream os;
    if (event->event_id == SYSTEM_EVENT_SCAN_DONE) {
@@ -154,10 +154,144 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static esp_err_t event_handler(void *ctx, system_event_t *event)
+{
+    switch(event->event_id) {
+    case SYSTEM_EVENT_STA_START:
+        esp_wifi_connect();
+        break;
+    case SYSTEM_EVENT_STA_GOT_IP:
+        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        /* This is a workaround as ESP32 WiFi libs don't currently
+           auto-reassociate. */
+        esp_wifi_connect();
+        xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+        break;
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static void initialize_sntp(void)
+{
+    ESP_LOGI(TAG, "Initializing SNTP");
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "192.168.70.7");
+    sntp_init();
+}
+
+static void initialise_wifi(void)
+{
+   tcpip_adapter_init();
+   wifi_event_group = xEventGroupCreate();
+   ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
+   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+   ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+   ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+   wifi_config_t wifi_config ;
+   memcpy(wifi_config.sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
+   memcpy(wifi_config.sta.password,"xxx",sizeof(uint8_t)*64);
+   wifi_config.sta.bssid_set = false;
+
+   ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
+   ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+   ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
+   ESP_ERROR_CHECK( esp_wifi_start() );
+
+    //begin wifi sta
+   // wifi_sta_config_t sta ;
+   // memcpy(sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
+   // memcpy(sta.password,"",sizeof(uint8_t)*64);
+   // sta.bssid_set = false;
+
+   // wifi_config_t sta_config = {
+   //    .sta = sta
+   // };
+   tcpip_adapter_ip_info_t ip_info;
+   ip4_addr_t ip = {ipaddr_addr("192.168.199.123")};
+   ip4_addr_t netmask = {ipaddr_addr("255.255.255.0")};
+   ip4_addr_t gw = {ipaddr_addr("192.168.199.1")};
+   ip_info.ip = ip;
+   ip_info.netmask = netmask;
+   ip_info.gw = gw;
+
+   // ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
+   // ESP_ERROR_CHECK( esp_wifi_start() );
+   tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
+   ESP_ERROR_CHECK( esp_wifi_connect() );
+   tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+}
+
+static void obtain_time(void)
+{
+    // ESP_ERROR_CHECK( nvs_flash_init() );
+    initialise_wifi();
+    xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
+                        false, true, portMAX_DELAY);
+    initialize_sntp();
+
+    // wait for time to be set
+    time_t now = 0;
+    struct tm timeinfo = { 0 };
+    int retry = 0;
+    const int retry_count = 10;
+    while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        time(&now);
+        localtime_r(&now, &timeinfo);
+    }
+
+    ESP_ERROR_CHECK( esp_wifi_stop() );
+}
+
+void ntpc()
+{
+    ++boot_count;
+    ESP_LOGI(TAG, "Boot count: %d", boot_count);
+
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    // Is time set? If not, tm_year will be (1970 - 1900).
+    if (timeinfo.tm_year < (2016 - 1900)) {
+        ESP_LOGI(TAG, "Time is not set yet. Connecting to WiFi and getting time over NTP.");
+        obtain_time();
+        // update 'now' variable with current time
+        time(&now);
+    }
+    char strftime_buf[64];
+
+    // Set timezone to Eastern Standard Time and print local time
+    setenv("TZ", "EST5EDT,M3.2.0/2,M11.1.0", 1);
+    tzset();
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+    ESP_LOGI(TAG, "The current date/time in New York is: %s", strftime_buf);
+
+    // Set timezone to China Standard Time
+    setenv("TZ", "CST-8", 1);
+    tzset();
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);//%c for common //%y%m%d %T
+    ESP_LOGI(TAG, "The current date/time in Shanghai is: %s", strftime_buf);
+
+    const int deep_sleep_sec = 180;
+    ESP_LOGI(TAG, "Entering deep sleep for %d seconds", deep_sleep_sec);
+    oled.draw_string(1,51,strftime_buf,WHITE,BLACK);
+    oled.refresh(true);
+    esp_deep_sleep(1000000LL * deep_sleep_sec);
+}
+
 void app_main() {
 	nvs_flash_init();
 	// system_init();
-
+   boot_count=0;
 	//oled test
 	oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 	if (oled.init()) {
@@ -182,21 +316,21 @@ void app_main() {
 	}
 
 	//wifi scan
-   tcpip_adapter_init();
-   ESP_ERROR_CHECK(esp_event_loop_init(event_handler, NULL));
-   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-   ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-   ESP_ERROR_CHECK(esp_wifi_start());
+   // tcpip_adapter_init();
+   // ESP_ERROR_CHECK(esp_event_loop_init(event_handler_scan, NULL));
+   // wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+   // ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+   // ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+   // ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+   // ESP_ERROR_CHECK(esp_wifi_start());
 
-   // Let us test a WiFi scan ...
-   wifi_scan_config_t scanConf = {
-      .ssid = NULL,
-      .bssid = NULL,
-      .channel = 0,
-      .show_hidden = true
-   };
+   // // Let us test a WiFi scan ...
+   // wifi_scan_config_t scanConf = {
+   //    .ssid = NULL,
+   //    .bssid = NULL,
+   //    .channel = 0,
+   //    .show_hidden = true
+   // };
 
    //start wifi scan
    // ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
@@ -208,30 +342,11 @@ void app_main() {
    //     vTaskDelay(1000 / portTICK_PERIOD_MS);
    // }
 
-   //begin wifi sta
-   wifi_sta_config_t sta ;
-   memcpy(sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
-   memcpy(sta.password,"",sizeof(uint8_t)*64);
-   sta.bssid_set = false;
-
-   wifi_config_t sta_config = {
-      .sta = sta
-   };
-   tcpip_adapter_ip_info_t ip_info;
-   ip4_addr_t ip = {ipaddr_addr("192.168.199.123")};
-   ip4_addr_t netmask = {ipaddr_addr("255.255.255.0")};
-   ip4_addr_t gw = {ipaddr_addr("192.168.199.1")};
-   ip_info.ip = ip;
-   ip_info.netmask = netmask;
-   ip_info.gw = gw;
-
-   ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
-   ESP_ERROR_CHECK( esp_wifi_start() );
-   tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
-   ESP_ERROR_CHECK( esp_wifi_connect() );
-   tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
+   //ntpc
+   ntpc();
    
 }
+
 #ifdef __cplusplus
 }
 #endif
