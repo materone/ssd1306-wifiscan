@@ -186,7 +186,7 @@ static void initialize_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, (char *)"192.168.78.51");
+    sntp_setservername(0, (char *)"45.76.98.188");
     sntp_init();
 }
 
@@ -200,7 +200,7 @@ static void initialise_wifi(void)
    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
    wifi_config_t wifi_config ;
    memcpy(wifi_config.sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
-   memcpy(wifi_config.sta.password,"xxx",sizeof(uint8_t)*64);
+   memcpy(wifi_config.sta.password,"xx",sizeof(uint8_t)*64);
    wifi_config.sta.bssid_set = false;
 
    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
@@ -244,7 +244,7 @@ static void obtain_time(void)
     time_t now = 0;
     struct tm timeinfo = { 0,0,0,0,0,0,0,0,0};
     int retry = 0;
-    const int retry_count = 10;
+    const int retry_count = 30;
     while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
