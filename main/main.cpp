@@ -45,7 +45,13 @@ static const char *TAG = "OLED-WiFi-RTC";
  * It is placed into RTC memory using RTC_DATA_ATTR and
  * maintains its value when ESP32 wakes from deep sleep.
  */
-RTC_DATA_ATTR static int boot_count ;
+static RTC_DATA_ATTR int boot_count ;
+void RTC_IRAM_ATTR esp_wake_deep_sleep(void){
+   esp_default_wake_deep_sleep();
+   static RTC_RODATA_ATTR const char fmt_str[] = "Wake count: %d\n";
+   ets_printf(fmt_str,boot_count);
+   boot_count++;
+}
 
 // static void obtain_time(void);
 // static void initialize_sntp(void);
@@ -180,7 +186,7 @@ static void initialize_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "192.168.70.7");
+    sntp_setservername(0, (char *)"192.168.78.51");
     sntp_init();
 }
 
@@ -236,7 +242,7 @@ static void obtain_time(void)
 
     // wait for time to be set
     time_t now = 0;
-    struct tm timeinfo = { 0 };
+    struct tm timeinfo = { 0,0,0,0,0,0,0,0,0};
     int retry = 0;
     const int retry_count = 10;
     while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
@@ -251,7 +257,7 @@ static void obtain_time(void)
 
 void ntpc()
 {
-    ++boot_count;
+    // ++boot_count;
     ESP_LOGI(TAG, "Boot count: %d", boot_count);
 
     time_t now;
@@ -273,25 +279,35 @@ void ntpc()
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The current date/time in New York is: %s", strftime_buf);
+    bool once = true;
 
     // Set timezone to China Standard Time
     setenv("TZ", "CST-8", 1);
     tzset();
-    localtime_r(&now, &timeinfo);
-    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);//%c for common //%y%m%d %T
-    ESP_LOGI(TAG, "The current date/time in Shanghai is: %s", strftime_buf);
+    while(1){
+      time(&now);
+      localtime_r(&now, &timeinfo);
+      strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);//%c for common //%y%m%d %T
+      if(once){
+         ESP_LOGI(TAG, "The current date/time in Shanghai is: %s", strftime_buf);
+         once = false;
+      }
 
-    const int deep_sleep_sec = 180;
-    ESP_LOGI(TAG, "Entering deep sleep for %d seconds", deep_sleep_sec);
-    oled.draw_string(1,51,strftime_buf,WHITE,BLACK);
-    oled.refresh(true);
-    esp_deep_sleep(1000000LL * deep_sleep_sec);
+    // const int deep_sleep_sec = 10;
+    // ESP_LOGI(TAG, "Entering deep sleep for %d seconds", deep_sleep_sec);
+    //esp_deep_sleep(1000000LL * deep_sleep_sec);
+      oled.fill_rectangle(1,51,126,11,BLACK);
+      oled.select_font(1);
+      oled.draw_string(1,51,strftime_buf,WHITE,BLACK);
+      oled.refresh(false);
+      vTaskDelay(1000/portTICK_PERIOD_MS);
+    }
 }
 
 void app_main() {
 	nvs_flash_init();
 	// system_init();
-   boot_count=0;
+   // boot_count=0;
 	//oled test
 	oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 	if (oled.init()) {
