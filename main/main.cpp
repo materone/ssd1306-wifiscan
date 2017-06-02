@@ -187,7 +187,7 @@ static void initialize_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, (char *)"pool.ntp.org");//45.76.98.188
+    sntp_setservername(0, (char *)"192.168.78.51");//45.76.98.188 pool.ntp.org
     sntp_init();
 }
 
@@ -200,7 +200,7 @@ static void initialise_wifi(void)
    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
    wifi_config_t wifi_config ;
-   memcpy(wifi_config.sta.ssid,"CoolDog",sizeof(uint8_t)*32); 
+   memcpy(wifi_config.sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
    memcpy(wifi_config.sta.password,"xx",sizeof(uint8_t)*64);
    wifi_config.sta.bssid_set = false;
 
@@ -233,7 +233,7 @@ static void initialise_wifi(void)
    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
    //set dns
    ip_addr_t dns ;//{{ipaddr_addr("8.8.8.8")},IPADDR_TYPE_V4};
-   ipaddr_aton("8.8.8.8",&dns);
+   ipaddr_aton("192.168.78.20",&dns);
    dns_setserver(0,&dns);
 }
 
