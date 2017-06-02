@@ -244,7 +244,7 @@ static void initialise_wifi(void)
    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
    //set dns
    ip_addr_t dns ;//{{ipaddr_addr("8.8.8.8")},IPADDR_TYPE_V4};
-   ipaddr_aton("192.168.70.21",&dns);// 8.8.8.8 192.168.70.21
+   ipaddr_aton("8.8.8.8",&dns);// 8.8.8.8 192.168.70.21
    dns_setserver(0,&dns);
 }
 
