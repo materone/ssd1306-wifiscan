@@ -220,15 +220,6 @@ static void initialise_wifi(void)
    ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
    ESP_ERROR_CHECK( esp_wifi_start() );
 
-    //begin wifi sta
-   // wifi_sta_config_t sta ;
-   // memcpy(sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
-   // memcpy(sta.password,"",sizeof(uint8_t)*64);
-   // sta.bssid_set = false;
-
-   // wifi_config_t sta_config = {
-   //    .sta = sta
-   // };
    tcpip_adapter_ip_info_t ip_info;
    ip4_addr_t ip = {ipaddr_addr("192.168.199.123")};
    ip4_addr_t netmask = {ipaddr_addr("255.255.255.0")};
@@ -237,14 +228,12 @@ static void initialise_wifi(void)
    ip_info.netmask = netmask;
    ip_info.gw = gw;
 
-   // ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
-   // ESP_ERROR_CHECK( esp_wifi_start() );
    tcpip_adapter_dhcpc_stop(TCPIP_ADAPTER_IF_STA);
    ESP_ERROR_CHECK( esp_wifi_connect() );
    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
    //set dns
-   ip_addr_t dns ;//{{ipaddr_addr("8.8.8.8")},IPADDR_TYPE_V4};
-   ipaddr_aton("8.8.8.8",&dns);// 8.8.8.8 192.168.70.21
+   ip_addr_t dns ;
+   ipaddr_aton("114.114.114.114",&dns);// 8.8.8.8 192.168.70.21 114.114.114.114
    dns_setserver(0,&dns);
 }
 
