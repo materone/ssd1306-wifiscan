@@ -28,7 +28,13 @@
 #include "lwip/dns.h"
 #include "apps/sntp/sntp.h"
 
+//wifi pass define
+// #define STA_NAME   "iCoolDog"
+// #define WIFI_PASS "pass"
+#include "wifipass.h"
+
 using namespace std;
+
 
 OLED oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 
@@ -187,7 +193,10 @@ static void initialize_sntp(void)
 {
     ESP_LOGI(TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, (char *)"192.168.78.51");//45.76.98.188 pool.ntp.org
+    sntp_setservername(0, (char *)"0.pool.ntp.org");//45.76.98.188 pool.ntp.org 192.168.78.51
+    sntp_setservername(1, (char *)"1.pool.ntp.org");//45.76.98.188 pool.ntp.org 192.168.78.51
+    sntp_setservername(2, (char *)"2.pool.ntp.org");//45.76.98.188 pool.ntp.org 192.168.78.51
+    sntp_setservername(3, (char *)"3.pool.ntp.org");//45.76.98.188 pool.ntp.org 192.168.78.51
     sntp_init();
 }
 
@@ -200,8 +209,8 @@ static void initialise_wifi(void)
    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
    wifi_config_t wifi_config ;
-   memcpy(wifi_config.sta.ssid,"iCoolDog",sizeof(uint8_t)*32); 
-   memcpy(wifi_config.sta.password,"xx",sizeof(uint8_t)*64);
+   memcpy(wifi_config.sta.ssid,STA_NAME,sizeof(uint8_t)*32); 
+   memcpy(wifi_config.sta.password,WIFI_PASS,sizeof(uint8_t)*64);
    wifi_config.sta.bssid_set = false;
 
    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
@@ -235,7 +244,7 @@ static void initialise_wifi(void)
    tcpip_adapter_set_ip_info(TCPIP_ADAPTER_IF_STA, &ip_info);
    //set dns
    ip_addr_t dns ;//{{ipaddr_addr("8.8.8.8")},IPADDR_TYPE_V4};
-   ipaddr_aton("192.168.78.20",&dns);
+   ipaddr_aton("192.168.70.21",&dns);// 8.8.8.8 192.168.70.21
    dns_setserver(0,&dns);
 }
 
@@ -251,7 +260,7 @@ static void obtain_time(void)
     time_t now = 0;
     struct tm timeinfo = { 0,0,0,0,0,0,0,0,0};
     int retry = 0;
-    const int retry_count = 30;
+    const int retry_count = 60;
     while(timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
         ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
