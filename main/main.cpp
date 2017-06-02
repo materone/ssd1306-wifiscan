@@ -205,6 +205,8 @@ static void initialise_wifi(void)
    wifi_config.sta.bssid_set = false;
 
    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
+   oled.draw_string(55, 41, (char *)wifi_config.sta.ssid, WHITE, BLACK);
+   oled.refresh(false);     
    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
    ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
    ESP_ERROR_CHECK( esp_wifi_start() );
@@ -301,9 +303,9 @@ void ntpc()
     // const int deep_sleep_sec = 10;
     // ESP_LOGI(TAG, "Entering deep sleep for %d seconds", deep_sleep_sec);
     //esp_deep_sleep(1000000LL * deep_sleep_sec);
-      oled.fill_rectangle(1,51,126,11,BLACK);
+      oled.fill_rectangle(1,52,126,11,BLACK);
       oled.select_font(1);
-      oled.draw_string(1,51,strftime_buf,WHITE,BLACK);
+      oled.draw_string(1,52,strftime_buf,WHITE,BLACK);
       oled.refresh(false);
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
@@ -323,11 +325,11 @@ void app_main() {
 		//deprecated conversion from string constant to 'char*'
 		oled.draw_string(1, 1, "glcd_5x7_font_info", WHITE, BLACK);
 		ESP_LOGI(TAG, "String length:%d",
-				oled.measure_string("glcd_5x7_font_info"));
+		oled.measure_string("glcd_5x7_font_info"));
 		oled.select_font(1);
 		oled.draw_string(1, 18, "tahoma_8pt_font_info", WHITE, BLACK);
 		ESP_LOGI(TAG, "String length:%d",
-				oled.measure_string("tahoma_8pt_font_info"));
+		oled.measure_string("tahoma_8pt_font_info"));
 		oled.draw_string(55, 30, "Hello ESP32!", WHITE, BLACK);
 		oled.refresh(true);
 		vTaskDelay(2000 / portTICK_PERIOD_MS);
