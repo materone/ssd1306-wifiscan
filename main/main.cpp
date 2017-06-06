@@ -135,13 +135,13 @@ esp_err_t event_handler_scan(void *ctx, system_event_t *event)
                break;
             case WIFI_AUTH_WEP:
                authmode = (char *)"WIFI_AUTH_WEP";
-               break;           
+               break;
             case WIFI_AUTH_WPA_PSK:
                authmode = (char *)"WIFI_AUTH_WPA_PSK";
-               break;           
+               break;
             case WIFI_AUTH_WPA2_PSK:
                authmode = (char *)"WIFI_AUTH_WPA2_PSK";
-               break;           
+               break;
             case WIFI_AUTH_WPA_WPA2_PSK:
                authmode = (char *)"WIFI_AUTH_WPA_WPA2_PSK";
                break;
@@ -209,13 +209,13 @@ static void initialise_wifi(void)
    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
    wifi_config_t wifi_config ;
-   memcpy(wifi_config.sta.ssid,STA_NAME,sizeof(uint8_t)*32); 
+   memcpy(wifi_config.sta.ssid,STA_NAME,sizeof(uint8_t)*32);
    memcpy(wifi_config.sta.password,WIFI_PASS,sizeof(uint8_t)*64);
    wifi_config.sta.bssid_set = false;
 
    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
    oled.draw_string(55, 41, (char *)wifi_config.sta.ssid, WHITE, BLACK);
-   oled.refresh(false);     
+   oled.refresh(false);
    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
    ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
    ESP_ERROR_CHECK( esp_wifi_start() );
@@ -356,7 +356,7 @@ void app_main() {
    //start wifi scan
    // ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
    //stop wifi scan                                                               //the scan is done.
-   // ESP_ERROR_CHECK(esp_wifi_scan_stop()); 
+   // ESP_ERROR_CHECK(esp_wifi_scan_stop());
    // while(true){
    //     ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
    //                                                               //the scan is done.
@@ -365,7 +365,7 @@ void app_main() {
 
    //ntpc
    ntpc();
-   
+
 }
 
 #ifdef __cplusplus
