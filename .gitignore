@@ -53,3 +53,7 @@ dkms.conf
 build
 sdkconfig.old
 wifipass.h
+.pioenvs
+.piolibdeps
+.clang_complete
+.gcc-flags.json
