@@ -184,7 +184,6 @@ esp_err_t event_handler_scan(void *ctx, system_event_t *event)
        ESP_LOGI(TAG,"Find Config AP %s",STAS[staidx]);
      }
     free(list);
-    printf("\n\n");
     xEventGroupSetBits(wifi_event_group, SCANDONE_BIT);
    }
    return ESP_OK;
