@@ -28,10 +28,14 @@
 #include "lwip/dns.h"
 #include "apps/sntp/sntp.h"
 
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+
 //wifi pass define
 // #define STA_NAME   "iCoolDog"
 // #define WIFI_PASS "pass"
-#include "wifipass.h"
+//#include "wifipass.h"
 
 using namespace std;
 
@@ -45,8 +49,15 @@ static EventGroupHandle_t wifi_event_group;
    but we only care about one event - are we connected
    to the AP with an IP? */
 const int CONNECTED_BIT = BIT0;
+const int SCANDONE_BIT = BIT1;
+
 
 static const char *TAG = "OLED-WiFi-RTC";
+
+static const char  STAS[][32] = {"XX","XX"};
+static const char  PASSS[][64] = {"XX","XX"};
+
+int staidx = 0;
 
 /* Variable holding number of times ESP32 restarted since first boot.
  * It is placed into RTC memory using RTC_DATA_ATTR and
@@ -65,6 +76,12 @@ void RTC_IRAM_ATTR esp_wake_deep_sleep(void){
 // static void initialise_wifi(void);
 // static esp_err_t event_handler(void *ctx, system_event_t *event);
 
+/* Constants that aren't configurable in menuconfig */
+#define WEB_SERVER "www.apache.org"
+#define WEB_PORT 80
+#define WEB_URL "http://www.apache.org/"
+
+static const char *REQUEST = "GET http://www.apache.org/ HTTP/1.0\r\nHost: www.apache.org\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n";
 
 void myTask(void *pvParameters) {
 	adc1_config_width(ADC_WIDTH_12Bit);
@@ -111,11 +128,16 @@ void myTask(void *pvParameters) {
 
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 esp_err_t event_handler_scan(void *ctx, system_event_t *event)
 {
-	ostringstream os;
+	// ostringstream os;
    if (event->event_id == SYSTEM_EVENT_SCAN_DONE) {
       uint16_t apCount = 0;
+      bool flag = false;
       esp_wifi_scan_get_ap_num(&apCount);
       printf("Number of access points found: %d\n",event->event_info.scan_done.number);
       if (apCount == 0) {
@@ -150,41 +172,52 @@ esp_err_t event_handler_scan(void *ctx, system_event_t *event)
                break;
          }
          printf("%26.26s    |    % 4d    |    %22.22s\n",list[i].ssid, list[i].rssi, authmode);
-         os.str("");
-         os << list[i].ssid;
-         oled.fill_rectangle(1,51,126,11,WHITE);
-         oled.select_font(1);
-         oled.draw_string(1,51,os.str(),BLACK,WHITE);
-         oled.refresh(true);
-         vTaskDelay(2000/portTICK_PERIOD_MS);
+         for (int j = 0; j < sizeof(STAS)/sizeof(STAS[0]); ++j)
+         {
+            if(strcmp((const char *)(list[i].ssid),STAS[j]) == 0){
+              flag = true;
+              staidx = j;
+              break;
+           }
+         }
+         
+         // os.str("");
+         // os << list[i].ssid;
+         // oled.fill_rectangle(1,51,126,11,WHITE);
+         // oled.select_font(1);
+         // oled.draw_string(1,51,os.str(),BLACK,WHITE);
+         // oled.refresh(true);
+         // vTaskDelay(2000/portTICK_PERIOD_MS);
       }
-      free(list);
-      printf("\n\n");
+
+     if (flag){
+       ESP_LOGI(TAG,"Find Config AP %s",STAS[staidx]);
+     }
+    free(list);
+    xEventGroupSetBits(wifi_event_group, SCANDONE_BIT);
    }
    return ESP_OK;
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-        esp_wifi_connect();
-        break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
-        break;
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-        /* This is a workaround as ESP32 WiFi libs don't currently
-           auto-reassociate. */
-        esp_wifi_connect();
-        xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
-        break;
-    default:
-        break;
+      case SYSTEM_EVENT_STA_START:
+          esp_wifi_connect();
+          break;
+      case SYSTEM_EVENT_STA_GOT_IP:
+          xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+          xEventGroupClearBits(wifi_event_group, SCANDONE_BIT);
+          break;
+      case SYSTEM_EVENT_STA_DISCONNECTED:
+          /* This is a workaround as ESP32 WiFi libs don't currently
+             auto-reassociate. */
+          esp_wifi_connect();
+          xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+          break;
+      default:
+          break;
     }
     return ESP_OK;
 }
@@ -203,14 +236,14 @@ static void initialize_sntp(void)
 static void initialise_wifi(void)
 {
    tcpip_adapter_init();
-   wifi_event_group = xEventGroupCreate();
-   ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
    wifi_config_t wifi_config ;
-   memcpy(wifi_config.sta.ssid,STA_NAME,sizeof(uint8_t)*32);
-   memcpy(wifi_config.sta.password,WIFI_PASS,sizeof(uint8_t)*64);
+   // wifi_config.sta.ssid = STAS[staidx];
+   // wifi_config.sta.password = PASSS[staidx];
+   memcpy(wifi_config.sta.ssid,STAS[staidx],sizeof(uint8_t)*32);
+   memcpy(wifi_config.sta.password,PASSS[staidx],sizeof(uint8_t)*64);
    wifi_config.sta.bssid_set = false;
 
    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
@@ -240,7 +273,6 @@ static void initialise_wifi(void)
 static void obtain_time(void)
 {
     // ESP_ERROR_CHECK( nvs_flash_init() );
-    initialise_wifi();
     xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
                         false, true, portMAX_DELAY);
     initialize_sntp();
@@ -303,21 +335,139 @@ void ntpc()
     //esp_deep_sleep(1000000LL * deep_sleep_sec);
       oled.fill_rectangle(1,52,126,11,BLACK);
       oled.select_font(1);
-      oled.draw_string(1,52,strftime_buf,WHITE,BLACK);
+      oled.draw_string(8,52,strftime_buf,WHITE,BLACK);
       oled.refresh(false);
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 }
 
+static void http_get_task(void *pvParameters)
+{
+    const struct addrinfo hints = {
+        ai_flags : AI_ALL,
+        ai_family : AF_INET,
+        ai_socktype : SOCK_STREAM,
+    };
+    struct addrinfo *res;
+    struct in_addr *addr;
+    int s, r;
+    char recv_buf[64];
+
+    while(1) {
+        /* Wait for the callback to set the CONNECTED_BIT in the
+           event group.
+        */
+        xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT,
+                            false, true, portMAX_DELAY);
+        ESP_LOGI(TAG, "Connected to AP");
+
+        int err = getaddrinfo(WEB_SERVER, "80", &hints, &res);
+
+        if(err != 0 || res == NULL) {
+            ESP_LOGE(TAG, "DNS lookup failed err=%d res=%p", err, res);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        /* Code to print the resolved IP.
+
+           Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
+        addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+        ESP_LOGI(TAG, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+
+        s = socket(res->ai_family, res->ai_socktype, 0);
+        if(s < 0) {
+            ESP_LOGE(TAG, "... Failed to allocate socket.");
+            freeaddrinfo(res);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            continue;
+        }
+        ESP_LOGI(TAG, "... allocated socket\r\n");
+
+        if(connect(s, res->ai_addr, res->ai_addrlen) != 0) {
+            ESP_LOGE(TAG, "... socket connect failed errno=%d", errno);
+            close(s);
+            freeaddrinfo(res);
+            vTaskDelay(4000 / portTICK_PERIOD_MS);
+            continue;
+        }
+
+        ESP_LOGI(TAG, "... connected");
+        freeaddrinfo(res);
+
+        if (write(s, REQUEST, strlen(REQUEST)) < 0) {
+            ESP_LOGE(TAG, "... socket send failed");
+            close(s);
+            vTaskDelay(4000 / portTICK_PERIOD_MS);
+            continue;
+        }
+        ESP_LOGI(TAG, "... socket send success");
+
+        /* Read HTTP response */
+        int b = 0;
+        do {
+            if (b > 2048) break; 
+            bzero(recv_buf, sizeof(recv_buf));
+            r = read(s, recv_buf, sizeof(recv_buf)-1);
+            b+=r;
+            for(int i = 0; i < r; i++) {
+                putchar(recv_buf[i]);
+            }
+            // printf("%d\n", b);
+        } while(r > 0);
+
+        ESP_LOGI(TAG, "... done reading from socket. Last read return=%d errno=%d\r\n", r, errno);
+        close(s);
+        for(int countdown = 10; countdown >= 0; countdown--) {
+            ESP_LOGI(TAG, "%d... ", countdown);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+        ESP_LOGI(TAG, "Starting again!");
+        break;
+    }
+}
+
 void app_main() {
 	nvs_flash_init();
-	// system_init();
+  // system_init();
+  //wifi scan
+  tcpip_adapter_init();
+
+  wifi_event_group = xEventGroupCreate();
+  
+  ESP_ERROR_CHECK(esp_event_loop_init(event_handler_scan, NULL));
+  wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+  ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+  ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+  ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+  ESP_ERROR_CHECK(esp_wifi_start());
+
+  // Let us test a WiFi scan ...
+  wifi_scan_config_t scanConf = {
+    .ssid = NULL,
+    .bssid = NULL,
+    .channel = 0,
+    .show_hidden = true
+  };
+
+  // start wifi scan
+  ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
+  // stop wifi scan                                                               
+  // the scan is done.
+  ESP_LOGI(TAG,"WiFi Scan Done!");
+  xEventGroupWaitBits(wifi_event_group, SCANDONE_BIT,
+                        false, true, portMAX_DELAY);
+  ESP_LOGI(TAG,"WiFi Scan Done Bit set!");
+  ESP_ERROR_CHECK(esp_wifi_scan_stop());
+  //for wifi connect in the future
+  esp_event_loop_set_cb(event_handler, NULL);
    // boot_count=0;
 	//oled test
 	oled = OLED(GPIO_NUM_18, GPIO_NUM_19, SSD1306_128x64);
 	if (oled.init()) {
 		ESP_LOGI(TAG, "oled inited");
-		oled.draw_rectangle(10, 30, 20, 20, WHITE);
+		oled.draw_rectangle(10, 30, 20, 20, WHITE);    
+    oled.fill_rectangle(12, 32, 16, 16, WHITE);
 		oled.draw_rectangle(0, 0, 128, 64, WHITE);
 		oled.select_font(0);
 		//deprecated conversion from string constant to 'char*'
@@ -336,37 +486,15 @@ void app_main() {
 		ESP_LOGE(TAG, "oled init failed");
 	}
 
-	//wifi scan
-   // tcpip_adapter_init();
-   // ESP_ERROR_CHECK(esp_event_loop_init(event_handler_scan, NULL));
-   // wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-   // ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-   // ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-   // ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-   // ESP_ERROR_CHECK(esp_wifi_start());
 
-   // // Let us test a WiFi scan ...
-   // wifi_scan_config_t scanConf = {
-   //    .ssid = NULL,
-   //    .bssid = NULL,
-   //    .channel = 0,
-   //    .show_hidden = true
-   // };
-
-   //start wifi scan
-   // ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
-   //stop wifi scan                                                               //the scan is done.
-   // ESP_ERROR_CHECK(esp_wifi_scan_stop());
-   // while(true){
-   //     ESP_ERROR_CHECK(esp_wifi_scan_start(&scanConf, true));    //The true parameter cause the function to block until
-   //                                                               //the scan is done.
-   //     vTaskDelay(1000 / portTICK_PERIOD_MS);
-   // }
-
+  initialise_wifi();
    //ntpc
    ntpc();
 
+   xTaskCreate(&http_get_task, "http_get_task", 4096, NULL, 5, NULL);
+
 }
+
 
 #ifdef __cplusplus
 }
